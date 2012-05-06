@@ -34,7 +34,7 @@ class Spawnd
      * @param StdClass $config The configuration of this process.
      * @return NULL
      */
-    private function _addProcess( $name, StdClass $config )
+    private function _setProcess( $name, StdClass $config )
     {
         //Validate process config.
         if( empty( $config->cmd ) )
@@ -43,7 +43,20 @@ class Spawnd
                 'Process config for ' . $name . ' is missing cmd property' );
         }
 
-        $this->_procs[ $name ] = $config;
+        if( empty( $this->_procs[ $name ] ) )
+        {
+            $this->_procs[ $name ] = new StdClass;
+        }
+
+        $fields = array( 'cmd' );
+
+        foreach( $fields as $field )
+        {
+            if( isset( $config->{ $field } ) )
+            {
+                $this->_procs[ $name ]->{ $field } = $config->{ $field };
+            }
+        }
     }
 
     /**
@@ -72,7 +85,7 @@ class Spawnd
                             }
                             else
                             {
-                                $this->_addProcess( $section, $config );
+                                $this->_setProcess( $section, $config );
                             }
                         }
                     }
@@ -101,6 +114,11 @@ class Spawnd
         {
             $this->_startProcesses();
             $this->_readProcesses();
+
+            if( empty( $this->_procs ) )
+            {
+                sleep(1);
+            }
         }
     }
 
@@ -111,6 +129,7 @@ class Spawnd
      */
     private function _startProcesses()
     {
+        $startedProcs   = 0;
         $descriptorSpec = array(
             1 => array( 'pipe', 'w' ),  // stdout
         );
@@ -139,7 +158,6 @@ class Spawnd
                     $this->_updateProcStatus( $procDetail );
                     echo "Started process " . $procDetail->pid
                         . " running " . $procDetail->cmd . "\n";
-                    sleep(1);
                 }
             }
         }
@@ -208,7 +226,7 @@ class Spawnd
         {
             foreach( $streams as $i => $stream )
             {
-                while( $buf = fread( $stream, 4096 ) )
+                while( $buf = fgets( $stream, 4096 ) )
                 {
                     echo $buf;
                 }
