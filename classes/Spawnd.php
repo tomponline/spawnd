@@ -33,7 +33,8 @@ class Spawnd
         $this->_procs   = array();
         $this->_config  = array();
         $this->_status  = new StdClass;
-        $this->_status->nextConfigParseTime = 0;
+        $this->_status->nextConfigParseTime     = 0;
+        $this->_status->nextStartProcessesTime  = 0;
     }
 
     /**
@@ -129,15 +130,27 @@ class Spawnd
     {
         while( TRUE )
         {
-            if( time() > $this->_status->nextConfigParseTime )
+            $time = time();
+
+            //Read and log output from running procesess.
+            $this->_readProcesses();
+            $this->_checkProcesses();
+
+            //Scan config directory and re-parse config every 10 seconds.
+            if( $time > $this->_status->nextConfigParseTime )
             {
                 $this->_parseConfig();
-                $this->_status->nextConfigParseTime = time() + 10;
+                $this->_status->nextConfigParseTime = $time + 10;
             }
 
-            $this->_startProcesses();
-            $this->_readProcesses();
+            //Start new processes if required every 5 seconds.
+            if( $time > $this->_status->nextStartProcessesTime )
+            {
+                $this->_startProcesses();
+                $this->_status->nextStartProcessesTime = $time + 5;
+            }
 
+            //If there are no enabled process, then sleep.
             if( !$this->_getEnabledProcessCount() )
             {
                 sleep( 1 );
@@ -165,36 +178,22 @@ class Spawnd
     }
 
     /**
-     * This method checks each managed process, and it is not running
-     * then it attempts to start it.
+     * This method starts processes if they are enabled but not running.
      * @return NULL
      */
     private function _startProcesses()
     {
         $startedProcs   = 0;
         $descriptorSpec = array(
-            1 => array( 'pipe', 'w' ),  // stdout
+            1 => array( 'pipe', 'w' ),  // stdout stream.
         );
 
         foreach( $this->_procs as $procName => $procDetail )
         {
-            $this->_updateProcStatus( $procDetail );
-
-            if( isset( $procDetail->pid ) && !$procDetail->running )
-            {
-                $this->_logInfo( 'Process stopped (' . $procDetail->pid . ')'
-                    . ' with exit code '
-                    . $procDetail->exitcode, $procName );
-               unset( $procDetail->pid );
-               unset( $procDetail->proc );
-               unset( $procDetail->stdout );
-            }
-
             //Start process if it is enabled, and not running.
             if( !empty( $procDetail->enabled ) &&
                 ( !isset( $procDetail->running ) || !$procDetail->running ) )
             {
-
                 $proc = proc_open( $procDetail->cmd, $descriptorSpec, $pipes );
 
                 if( is_resource( $proc ) )
@@ -207,6 +206,29 @@ class Spawnd
                     $this->_logInfo( 'Process started (' . $procDetail->pid .')'
                         . ' command "' . $procDetail->cmd . '"', $procName );
                 }
+            }
+        }
+    }
+
+    /**
+     * This method checks the current state of processes and cleans up
+     * when a process stop.
+     * @return NULL
+     */
+    private function _checkProcesses()
+    {
+        foreach( $this->_procs as $procName => $procDetail )
+        {
+            $this->_updateProcStatus( $procDetail );
+
+            if( isset( $procDetail->pid ) && !$procDetail->running )
+            {
+                $this->_logInfo( 'Process stopped (' . $procDetail->pid . ')'
+                    . ' with exit code '
+                    . $procDetail->exitcode, $procName );
+               unset( $procDetail->pid );
+               unset( $procDetail->proc );
+               unset( $procDetail->stdout );
             }
         }
     }
