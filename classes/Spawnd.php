@@ -33,7 +33,7 @@ class Spawnd
         $this->_procs   = array();
         $this->_config  = array();
         $this->_status  = new StdClass;
-        $this->_stats->nextConfigParseTime = 0;
+        $this->_status->nextConfigParseTime = 0;
     }
 
     /**
@@ -56,7 +56,7 @@ class Spawnd
             $this->_procs[ $name ] = new StdClass;
         }
 
-        $fields = array( 'cmd' );
+        $fields = array( 'cmd', 'enabled' );
 
         foreach( $fields as $field )
         {
@@ -127,11 +127,30 @@ class Spawnd
             $this->_startProcesses();
             $this->_readProcesses();
 
-            if( empty( $this->_procs ) )
+            if( !$this->_getEnabledProcessCount() )
             {
-                sleep(1);
+                sleep( 1 );
             }
         }
+    }
+
+    /**
+     * This method counts how many processes are enabled.
+     * @return int The number of processes enabled.
+     */
+    private function _getEnabledProcessCount()
+    {
+        $enabledCount = 0;
+
+        foreach( $this->_procs as $proc )
+        {
+            if( !empty( $proc->enabled ) )
+            {
+                $enabledCount++;
+            }
+        }
+
+        return $enabledCount;
     }
 
     /**
@@ -150,15 +169,17 @@ class Spawnd
         {
             $this->_updateProcStatus( $procDetail );
 
-            if( isset( $procDetail->pid ) && !$procDetail->running )
+            //Start process if it is enabled, and not running.
+            if( !empty( $procDetail->enabled ) &&
+                ( !isset( $procDetail->running ) || !$procDetail->running ) )
             {
-                echo "Process " . $procDetail->pid
-                    . " has stopped with exit code "
-                    . $procDetail->exitcode . "\n";
-            }
+                if( isset( $procDetail->pid ) )
+                {
+                    echo "Process " . $procDetail->pid
+                        . " has stopped with exit code "
+                        . $procDetail->exitcode . "\n";
+                }
 
-            if( !isset( $procDetail->running ) || !$procDetail->running )
-            {
                 $proc = proc_open( $procDetail->cmd, $descriptorSpec, $pipes );
 
                 if( is_resource( $proc ) )
@@ -212,7 +233,10 @@ class Spawnd
         //Build a read array.
         foreach( $this->_procs as $i => $procDetail )
         {
-            $readStreams[ $i ] = $procDetail->stdout;
+            if( !empty( $procDetail->stdout ) )
+            {
+                $readStreams[ $i ] = $procDetail->stdout;
+            }
         }
 
         $NULL = NULL;
