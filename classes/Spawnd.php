@@ -1,4 +1,3 @@
-#!/usr/bin/php
 <?php
 /**
  * This class is the Spanwd process manager.
