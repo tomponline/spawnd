@@ -22,18 +22,26 @@ class Spawnd
     }
 
     /**
-     * This method starts the process manager and enters main loop.
-     * @param array Config containing processes to run.
+     * This method lets you add processes to be managed.
+     * @param string $name The name of the process to be managed.
+     * @param array $config The configuration of this process.
      * @return NULL
      */
-    public function run( array $procs )
+    public function addProcess( $name, array $config )
     {
-        $this->_procs = $procs;
+        $this->_procs[ $name ] = (object) $config;
+    }
 
+    /**
+     * This method starts the process manager and enters main loop.
+     * @return NULL
+     */
+    public function run()
+    {
         while( TRUE )
         {
-            $this->_startProcesses( $procs );
-            $this->_readProcesses( $procs );
+            $this->_startProcesses();
+            $this->_readProcesses();
         }
     }
 
