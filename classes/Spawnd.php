@@ -23,10 +23,13 @@ class Spawnd
 
     /**
      * This method starts the process manager and enters main loop.
+     * @param array Config containing processes to run.
      * @return NULL
      */
-    public function run()
+    public function run( array $procs )
     {
+        $this->_procs = $procs;
+
         while( TRUE )
         {
             $this->_startProcesses( $procs );
@@ -47,7 +50,7 @@ class Spawnd
 
         foreach( $this->_procs as $i => $procDetail )
         {
-            updateProcStatus( $procDetail );
+            $this->_updateProcStatus( $procDetail );
 
             if( isset( $procDetail->pid ) && !$procDetail->running )
             {
@@ -66,7 +69,7 @@ class Spawnd
                     $procDetail->stdout = $pipes[ 1 ];
                     stream_set_blocking ( $procDetail->stdout , FALSE );
                     $procs[ $i ] = $procDetail;
-                    updateProcStatus( $procDetail );
+                    $this->_updateProcStatus( $procDetail );
                     echo "Started process " . $procDetail->pid
                         . " running " . $procDetail->cmd . "\n";
                     sleep(1);
