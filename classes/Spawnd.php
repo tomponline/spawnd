@@ -20,12 +20,20 @@ class Spawnd
     private $_config;
 
     /**
+     * @var This variable contains status information.
+     */
+    private $_status;
+
+    /**
      * This method initialises the internal processes list array.
      * @return NULL
      */
     public function __construct()
     {
-        $this->_procs = array();
+        $this->_procs   = array();
+        $this->_config  = array();
+        $this->_status  = new StdClass;
+        $this->_stats->nextConfigParseTime = 0;
     }
 
     /**
@@ -108,10 +116,14 @@ class Spawnd
      */
     public function run()
     {
-        $this->_parseConfig();
-
         while( TRUE )
         {
+            if( time() > $this->_status->nextConfigParseTime )
+            {
+                $this->_parseConfig();
+                $this->_status->nextConfigParseTime = time() + 10;
+            }
+
             $this->_startProcesses();
             $this->_readProcesses();
 
