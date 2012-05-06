@@ -37,6 +37,17 @@ class Spawnd
     }
 
     /**
+     * This method logs messages to syslog with a prefixed process name.
+     * @param $data string The data to log.
+     * @param $procName string The process name to prefix.
+     * @return NULL
+     */
+    private function _logInfo( $data, $procName = 'spawnd' )
+    {
+        error_log( 'spawnd[' . $procName . ']: ' . $data );
+    }
+
+    /**
      * This method lets you add processes to be managed.
      * @param string $name The name of the process to be managed.
      * @param StdClass $config The configuration of this process.
@@ -165,20 +176,24 @@ class Spawnd
             1 => array( 'pipe', 'w' ),  // stdout
         );
 
-        foreach( $this->_procs as $i => $procDetail )
+        foreach( $this->_procs as $procName => $procDetail )
         {
             $this->_updateProcStatus( $procDetail );
+
+            if( isset( $procDetail->pid ) && !$procDetail->running )
+            {
+                $this->_logInfo( 'Process stopped (' . $procDetail->pid . ')'
+                    . ' with exit code '
+                    . $procDetail->exitcode, $procName );
+               unset( $procDetail->pid );
+               unset( $procDetail->proc );
+               unset( $procDetail->stdout );
+            }
 
             //Start process if it is enabled, and not running.
             if( !empty( $procDetail->enabled ) &&
                 ( !isset( $procDetail->running ) || !$procDetail->running ) )
             {
-                if( isset( $procDetail->pid ) )
-                {
-                    echo "Process " . $procDetail->pid
-                        . " has stopped with exit code "
-                        . $procDetail->exitcode . "\n";
-                }
 
                 $proc = proc_open( $procDetail->cmd, $descriptorSpec, $pipes );
 
@@ -187,10 +202,10 @@ class Spawnd
                     $procDetail->proc   = $proc;
                     $procDetail->stdout = $pipes[ 1 ];
                     stream_set_blocking ( $procDetail->stdout , FALSE );
-                    $procs[ $i ] = $procDetail;
+                    $procs[ $procName ] = $procDetail;
                     $this->_updateProcStatus( $procDetail );
-                    echo "Started process " . $procDetail->pid
-                        . " running " . $procDetail->cmd . "\n";
+                    $this->_logInfo( 'Process started (' . $procDetail->pid .')'
+                        . ' command "' . $procDetail->cmd . '"', $procName );
                 }
             }
         }
@@ -209,6 +224,7 @@ class Spawnd
             {
                 foreach( $status as $key => $value )
                 {
+                    //Do not overwrite the original exit code.
                     if( $key === 'exitcode' && $value === -1 )
                     {
                         continue;
@@ -231,11 +247,11 @@ class Spawnd
         $readStreams = array();
 
         //Build a read array.
-        foreach( $this->_procs as $i => $procDetail )
+        foreach( $this->_procs as $procName => $procDetail )
         {
             if( !empty( $procDetail->stdout ) )
             {
-                $readStreams[ $i ] = $procDetail->stdout;
+                $readStreams[ $procName ] = $procDetail->stdout;
             }
         }
 
@@ -260,11 +276,11 @@ class Spawnd
         //Read output from processes.
         if( $streams = $this->_streamSelect() )
         {
-            foreach( $streams as $i => $stream )
+            foreach( $streams as $procName => $stream )
             {
-                while( $buf = fgets( $stream, 4096 ) )
+                while( $line = fgets( $stream, 4096 ) )
                 {
-                    echo $buf;
+                   $this->_logInfo( $line, $procName );
                 }
             }
         }
