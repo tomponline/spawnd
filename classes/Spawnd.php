@@ -1,6 +1,6 @@
 <?php
 /**
- * This class is the Spanwd process manager.
+ * This class is the Spawnd process manager.
  * @author Thomas Parrott
  * @package spawnd
  */
