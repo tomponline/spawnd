@@ -5,12 +5,12 @@ Process manager written in PHP. It manages persistent processes and restarts the
 
 It supports the following features currently:
 
-#Running multiple concurrent processes
-#Restarting processes if they stop
-#Modifying configuration live without restarting
-#Enable/disable processes without restarting
+*Running multiple concurrent processes
+*Restarting processes if they stop
+*Modifying configuration live without restarting
+*Enable/disable processes without restarting
 
-#Configuring
+##Configuring
 Spanwd is configured with ini files in /etc/spawnd
 
 You can create 1 single ini file or multiple smaller ones.
