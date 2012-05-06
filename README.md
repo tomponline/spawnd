@@ -11,7 +11,7 @@ It supports the following features currently:
 * Enable/disable processes without restarting
 
 ##Configuring
-Spanwd is configured with ini files in /etc/spawnd
+Spawnd is configured with ini files in /etc/spawnd
 
 You can create 1 single ini file or multiple smaller ones.
 
