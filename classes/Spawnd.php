@@ -66,6 +66,7 @@ class Spawnd
         if( empty( $this->_procs[ $name ] ) )
         {
             $this->_procs[ $name ] = new StdClass;
+            $this->_logInfo( 'Added process', $name );
         }
 
         $fields = array( 'cmd', 'enabled' );
@@ -74,7 +75,14 @@ class Spawnd
         {
             if( isset( $config->{ $field } ) )
             {
-                $this->_procs[ $name ]->{ $field } = $config->{ $field };
+                //Log updates to config if they are new or changed.
+                if( !isset( $this->_procs[ $name ]->{ $field } ) ||
+                    $config->{ $field } !== $this->_procs[ $name ]->{ $field } )
+                {
+                    $this->_procs[ $name ]->{ $field } = $config->{ $field };
+                    $this->_logInfo( 'Set ' . $field . ' = "'
+                        . $config->{ $field } .'"', $name );
+                }
             }
         }
     }
@@ -128,12 +136,14 @@ class Spawnd
      */
     public function run()
     {
+        $this->_logInfo( 'Started' );
+
         while( TRUE )
         {
             $time = time();
 
             //Read and log output from running procesess.
-            $this->_readProcesses();
+            $streamCount = $this->_readProcesses();
             $this->_checkProcesses();
 
             //Scan config directory and re-parse config every 10 seconds.
@@ -150,12 +160,15 @@ class Spawnd
                 $this->_status->nextStartProcessesTime = $time + 5;
             }
 
-            //If there are no enabled process, then sleep.
-            if( !$this->_getEnabledProcessCount() )
+            //If there are no enabled process or no active streams
+            //that can block, then sleep to prevent CPU hogging loop.
+            if( !$this->_getEnabledProcessCount() || !$streamCount )
             {
                 sleep( 1 );
             }
         }
+
+        $this->_logInfo( 'Stopped' );
     }
 
     /**
@@ -291,13 +304,17 @@ class Spawnd
 
     /**
      * This method reads from any process streams that are ready to be read.
-     * @return NULL
+     * @return int The number of streams read.
      */
     private function _readProcesses()
     {
+        $streamCount = 0;
+
         //Read output from processes.
         if( $streams = $this->_streamSelect() )
         {
+            $streamCount = count( $streams );
+
             foreach( $streams as $procName => $stream )
             {
                 while( $line = fgets( $stream, 4096 ) )
@@ -306,5 +323,7 @@ class Spawnd
                 }
             }
         }
+
+        return $streamCount;
     }
 }
