@@ -7,10 +7,17 @@
  */
 class Spawnd
 {
+    const INI_DIR = '/etc/spawnd';
+
     /**
      * @var This variable stores information about the managed processes.
      */
     private $_procs;
+
+    /**
+     * @var This variable stores global config settings.
+     */
+    private $_config;
 
     /**
      * This method initialises the internal processes list array.
@@ -24,12 +31,62 @@ class Spawnd
     /**
      * This method lets you add processes to be managed.
      * @param string $name The name of the process to be managed.
-     * @param array $config The configuration of this process.
+     * @param StdClass $config The configuration of this process.
      * @return NULL
      */
-    public function addProcess( $name, array $config )
+    private function _addProcess( $name, StdClass $config )
     {
-        $this->_procs[ $name ] = (object) $config;
+        //Validate process config.
+        if( empty( $config->cmd ) )
+        {
+            throw new Exception(
+                'Process config for ' . $name . ' is missing cmd property' );
+        }
+
+        $this->_procs[ $name ] = $config;
+    }
+
+    /**
+     * This method parses the files in /etc/spawnd directory.
+     * @return NULL
+     */
+    private function _parseConfig()
+    {
+        if( is_dir( self::INI_DIR ) && $files = scandir( self::INI_DIR ) )
+        {
+            foreach( $files as $fileName )
+            {
+                $file = self::INI_DIR . '/' . $fileName;
+
+                if( is_file( $file ) )
+                {
+                    if( $sections = parse_ini_file( $file, TRUE ) )
+                    {
+                        foreach( $sections as $section => $config )
+                        {
+                            $config = (object) $config;
+
+                            if( 'spawnd' === $section )
+                            {
+                                $this->_config = $config;
+                            }
+                            else
+                            {
+                                $this->_addProcess( $section, $config );
+                            }
+                        }
+                    }
+                    else
+                    {
+                        throw new Exception( $file . ' file is invalid' );
+                    }
+                }
+            }
+        }
+        else
+        {
+            throw new Exception( self::INI_DIR . ' directory does not exist' );
+        }
     }
 
     /**
@@ -38,6 +95,8 @@ class Spawnd
      */
     public function run()
     {
+        $this->_parseConfig();
+
         while( TRUE )
         {
             $this->_startProcesses();
@@ -149,8 +208,10 @@ class Spawnd
         {
             foreach( $streams as $i => $stream )
             {
-                $buf = fread( $stream, 4096 );
-                echo $buf;
+                while( $buf = fread( $stream, 4096 ) )
+                {
+                    echo $buf;
+                }
             }
         }
     }
